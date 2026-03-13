@@ -1,0 +1,113 @@
+# Sanitization Rules Configuration for AIOX Ray
+# Copy this file to .aiox-ray-sanitize.yaml and customize as needed
+# Rules are applied in order (first match wins)
+
+sanitization_rules:
+  # AWS Credentials
+  - name: "AWS_ACCESS_KEY"
+    description: "AWS Access Key ID (AKIA...)"
+    pattern: "AKIA[0-9A-Z]{16}"
+    replace_with: "[REDACTED]"
+
+  - name: "AWS_SECRET_KEY"
+    description: "AWS Secret Access Key"
+    pattern: "aws_secret_access_key\\s*=\\s*[a-zA-Z0-9/+]+"
+    replace_with: "[REDACTED]"
+
+  # Google Cloud
+  - name: "GCP_API_KEY"
+    description: "Google Cloud API Key"
+    pattern: "AIza[0-9A-Za-z\\-_]{35}"
+    replace_with: "[REDACTED]"
+
+  # JWT Tokens
+  - name: "JWT_TOKEN"
+    description: "JWT Bearer Token (eyJ...)"
+    pattern: "eyJ[A-Za-z0-9_-]+\\.[A-Za-z0-9_-]+\\.[A-Za-z0-9_-]+"
+    replace_with: "[REDACTED]"
+
+  # Bearer Tokens
+  - name: "BEARER_TOKEN"
+    description: "Bearer tokens in Authorization headers"
+    pattern: "(?i)(bearer|token)\\s+[a-z0-9._-]+"
+    replace_with: "[REDACTED]"
+
+  # Stripe Keys
+  - name: "STRIPE_KEY"
+    description: "Stripe API Keys (sk_live_, pk_live_, etc.)"
+    pattern: "(sk_live_|pk_live_|rk_live_|sh_live_)[a-zA-Z0-9]+"
+    replace_with: "[REDACTED]"
+
+  # Email Addresses (PII)
+  - name: "EMAIL_ADDRESS"
+    description: "Email addresses"
+    pattern: "[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}"
+    replace_with: "[REDACTED]"
+
+  # Phone Numbers (PII)
+  - name: "PHONE_NUMBER"
+    description: "Phone numbers (various formats)"
+    pattern: "\\+?[1-9]\\d{1,14}"
+    replace_with: "[REDACTED]"
+
+  # Credit Card Numbers
+  - name: "CREDIT_CARD"
+    description: "Credit card numbers (PCI)"
+    pattern: "[0-9]{4}[\\s-]?[0-9]{4}[\\s-]?[0-9]{4}[\\s-]?[0-9]{4}"
+    replace_with: "[REDACTED]"
+
+  # Database Connection Strings
+  - name: "DATABASE_PASSWORD"
+    description: "Database passwords in connection strings"
+    pattern: "(password|pwd)\\s*[=:]\\s*[^\\s;]+"
+    replace_with: "[REDACTED]"
+
+  # SSH Keys
+  - name: "SSH_PRIVATE_KEY"
+    description: "SSH private keys"
+    pattern: "-----BEGIN (RSA|DSA|EC)? PRIVATE KEY-----"
+    replace_with: "[REDACTED]"
+
+  # OAuth Tokens
+  - name: "OAUTH_TOKEN"
+    description: "OAuth access tokens"
+    pattern: "(access_token|oauth_token)\\s*[=:]\\s*[a-zA-Z0-9._-]+"
+    replace_with: "[REDACTED]"
+
+  # API Keys (generic)
+  - name: "API_KEY"
+    description: "Generic API keys"
+    pattern: "(api[_-]?key|apikey)\\s*[=:]\\s*[a-zA-Z0-9._-]+"
+    replace_with: "[REDACTED]"
+
+# Configuration Options
+config:
+  # Enable/disable sanitization globally
+  enabled: true
+
+  # Log when secrets are redacted (debug level only, doesn't leak patterns)
+  log_redactions: true
+
+  # Performance mode: use compiled patterns (faster)
+  use_compiled_patterns: true
+
+  # Fail-safe mode: if sanitization fails, continue (don't block event)
+  fail_safe: true
+
+# Testing Examples
+# To test a new rule, create a sample payload:
+#
+# Example AWS Key:
+# {
+#   "aws_key": "AKIAIOSFODNN7EXAMPLE",
+#   "message": "Using AKIAIOSFODNN7EXAMPLE for authentication"
+# }
+#
+# Expected Result:
+# {
+#   "aws_key": "[REDACTED]",
+#   "message": "Using [REDACTED] for authentication"
+# }
+#
+# Run test with:
+# npm run test -- --testNamePattern="sanitizer"

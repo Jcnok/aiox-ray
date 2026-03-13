@@ -12,7 +12,7 @@
 const { EventEmitter } = require('./event-emitter');
 const { SchemaValidator } = require('./schema');
 const { SkillHook } = require('./skill-hook');
-const { ParameterSanitizer } = require('./sanitizer');
+const { ParameterSanitizer, RegexSanitizer } = require('./sanitizer');
 const { initializeDevAgentInstrumentation, executeDevAgentWithInstrumentation } = require('./dev-agent-hook');
 const { initializeQAAgentInstrumentation, executeQAAgentWithInstrumentation } = require('./qa-agent-hook');
 const { initializeArchitectAgentInstrumentation, executeArchitectAgentWithInstrumentation } = require('./architect-agent-hook');
@@ -22,6 +22,7 @@ module.exports = {
   SchemaValidator,
   SkillHook,
   ParameterSanitizer,
+  RegexSanitizer,
   initializeDevAgentInstrumentation,
   executeDevAgentWithInstrumentation,
   initializeQAAgentInstrumentation,
