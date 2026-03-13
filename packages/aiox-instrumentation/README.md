@@ -270,37 +270,41 @@ npm run test:all
 - Delivery is async (doesn't block agent execution)
 - No synchronous I/O in critical path
 
-## Integration with @dev Agent
+## Integration with Agents
 
-### 1. Import and Initialize
+All AIOX agents use the same instrumentation pattern. Implemented agents: **@dev**, **@qa**, **@architect**
+
+### Integration Pattern (applies to all agents)
+
+#### 1. Import and Initialize
 
 ```javascript
-// In @dev agent initialization
+// In agent initialization
 const { EventEmitter } = require('@aiox-ray/instrumentation');
 const { v4: uuidv4 } = require('uuid');
 
 const emitter = new EventEmitter();
 ```
 
-### 2. Emit on Activation
+#### 2. Emit on Activation
 
 ```javascript
-// Before @dev begins processing
+// Before agent begins processing
 const executionId = uuidv4();
 
 emitter.emit('agent.started', {
-  agent_id: 'dev',
+  agent_id: 'dev', // or 'qa', 'architect'
   execution_id: executionId,
   input: taskDescription,
 });
 ```
 
-### 3. Emit on Completion
+#### 3. Emit on Completion
 
 ```javascript
-// After @dev completes (success or error)
+// After agent completes (success or error)
 emitter.emit('agent.finished', {
-  agent_id: 'dev',
+  agent_id: 'dev', // or 'qa', 'architect'
   execution_id: executionId,
   status: 'success', // or 'error', 'partial'
   output: result,
@@ -308,7 +312,7 @@ emitter.emit('agent.finished', {
 });
 ```
 
-### 4. Error Handling
+#### 4. Error Handling
 
 Event emission failures are handled gracefully:
 
@@ -325,27 +329,66 @@ try {
 // Events are dropped after max retries with warning
 ```
 
-## Extending for Other Agents
+### Agent-Specific Implementations
 
-The same pattern applies to @qa, @architect agents:
+Reference implementations provided for each agent:
+
+- **@dev Agent:** `src/dev-agent-hook.js`
+- **@qa Agent:** `src/qa-agent-hook.js`
+- **@architect Agent:** `src/architect-agent-hook.js`
+
+Each provides:
+- `initialize{Agent}AgentInstrumentation()` function
+- `execute{Agent}AgentWithInstrumentation()` wrapper
+
+#### Example: @qa Agent
 
 ```javascript
-// Story 1.2: Extend to @qa and @architect
-const emitter = new EventEmitter();
+const {
+  initializeQAAgentInstrumentation,
+  executeQAAgentWithInstrumentation,
+} = require('@aiox-ray/instrumentation/src/qa-agent-hook');
 
-// For @qa agent
-emitter.emit('agent.started', {
-  agent_id: 'qa', // Change agent_id
-  execution_id: uuidv4(),
-  input: testInput,
-});
+const emitter = initializeQAAgentInstrumentation();
 
-// For @architect agent
-emitter.emit('agent.started', {
-  agent_id: 'architect', // Change agent_id
-  execution_id: uuidv4(),
-  input: designTask,
-});
+const result = await executeQAAgentWithInstrumentation(
+  emitter,
+  'Run test suite',
+  async () => {
+    // QA agent work here
+    return testResults;
+  }
+);
+```
+
+#### Example: @architect Agent
+
+```javascript
+const {
+  initializeArchitectAgentInstrumentation,
+  executeArchitectAgentWithInstrumentation,
+} = require('@aiox-ray/instrumentation/src/architect-agent-hook');
+
+const emitter = initializeArchitectAgentInstrumentation();
+
+const result = await executeArchitectAgentWithInstrumentation(
+  emitter,
+  'Design system architecture',
+  async () => {
+    // Architect agent work here
+    return architectureSpec;
+  }
+);
+```
+
+### Extending for Additional Agents
+
+The same pattern applies to any new agents (@pm, @po, @sm, etc.):
+
+```javascript
+// Create new hook file: src/{agent}-agent-hook.js
+// Follow the pattern from dev-agent-hook.js
+// Change agent_id to match the new agent ('pm', 'po', 'sm', etc.)
 ```
 
 ## Troubleshooting
