@@ -1,0 +1,86 @@
+name: Story Validation
+
+on:
+  pull_request:
+    paths:
+      - 'docs/stories/**/*.md'
+      - 'docs/prd.md'
+
+jobs:
+  story-validation:
+    name: Validate Story Completeness
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+
+      - name: Validate story format
+        run: |
+          echo "## Story Validation Report"
+          echo ""
+
+          # Check for required sections in stories
+          for story_file in docs/stories/*.story.md; do
+            if [ -f "$story_file" ]; then
+              echo "Checking: $(basename "$story_file")"
+
+              # Verify YAML frontmatter
+              if grep -q "^---$" "$story_file"; then
+                echo "  ✓ YAML frontmatter present"
+              else
+                echo "  ✗ YAML frontmatter missing"
+              fi
+
+              # Verify story statement
+              if grep -q "^## Story Statement$" "$story_file"; then
+                echo "  ✓ Story statement section found"
+              else
+                echo "  ✗ Story statement section missing"
+              fi
+
+              # Verify acceptance criteria
+              if grep -q "^## Acceptance Criteria$" "$story_file"; then
+                echo "  ✓ Acceptance criteria found"
+              else
+                echo "  ✗ Acceptance criteria missing"
+              fi
+
+              # Verify tasks
+              if grep -q "^## Tasks / Subtasks$" "$story_file"; then
+                echo "  ✓ Tasks section found"
+              else
+                echo "  ✗ Tasks section missing"
+              fi
+
+              # Verify definition of done
+              if grep -q "^## Definition of Done$" "$story_file"; then
+                echo "  ✓ Definition of Done found"
+              else
+                echo "  ✗ Definition of Done missing"
+              fi
+
+              echo ""
+            fi
+          done
+
+      - name: Story Statistics
+        run: |
+          STORY_COUNT=$(find docs/stories -name "*.story.md" | wc -l)
+          echo "Total stories: $STORY_COUNT"
+
+          # Count by status
+          DRAFT=$(grep -l "status: \"Draft\"" docs/stories/*.story.md 2>/dev/null | wc -l)
+          READY=$(grep -l "status: \"Ready\"" docs/stories/*.story.md 2>/dev/null | wc -l)
+          INPROGRESS=$(grep -l "status: \"InProgress\"" docs/stories/*.story.md 2>/dev/null | wc -l)
+          DONE=$(grep -l "status: \"Done\"" docs/stories/*.story.md 2>/dev/null | wc -l)
+
+          echo "Status breakdown:"
+          echo "- Draft: $DRAFT"
+          echo "- Ready: $READY"
+          echo "- InProgress: $INPROGRESS"
+          echo "- Done: $DONE"

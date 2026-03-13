@@ -1,0 +1,60 @@
+name: CodeRabbit Review Integration
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+
+jobs:
+  coderabbit-review:
+    name: CodeRabbit Analysis
+    runs-on: ubuntu-latest
+    if: github.event.pull_request.draft == false
+    continue-on-error: true
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: CodeRabbit Review Status
+        run: |
+          echo "## CodeRabbit Integration" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "CodeRabbit CLI is configured for manual execution via @devops agent." >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**To run CodeRabbit review:**" >> $GITHUB_STEP_SUMMARY
+          echo "- Activate: \`@devops\`" >> $GITHUB_STEP_SUMMARY
+          echo "- Execute: \`*pre-push\` (for uncommitted changes)" >> $GITHUB_STEP_SUMMARY
+          echo "- Or: \`wsl bash -c 'cd /mnt/c/path && ~/.local/bin/coderabbit --prompt-only --base main'\`" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Gate Rules:**" >> $GITHUB_STEP_STEP_SUMMARY
+          echo "- CRITICAL: Block PR (must fix)" >> $GITHUB_STEP_SUMMARY
+          echo "- HIGH: Warn (recommend fix)" >> $GITHUB_STEP_SUMMARY
+          echo "- MEDIUM: Document in PR (create follow-up)" >> $GITHUB_STEP_SUMMARY
+          echo "- LOW: Optional improvements" >> $GITHUB_STEP_SUMMARY
+
+      - name: Comment on PR
+        uses: actions/github-script@v7
+        with:
+          script: |
+            github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: `## 🤖 CodeRabbit Integration
+
+CodeRabbit automated code review is enabled for this repository.
+
+**To request a review before merge:**
+- Activate @devops agent
+- Run \`*pre-push\` to execute CodeRabbit
+
+**Quality Gate Rules:**
+- 🔴 **CRITICAL**: Block PR, must fix immediately
+- 🟠 **HIGH**: Warn, recommend fix before merge
+- 🟡 **MEDIUM**: Document in PR, create follow-up issue
+- 🟢 **LOW**: Optional improvements
+
+_Review will be added to PR comments when executed._`
+            })
