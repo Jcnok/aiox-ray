@@ -1,0 +1,76 @@
+version: '3.8'
+
+services:
+  # PostgreSQL Database
+  postgres:
+    image: postgres:14-alpine
+    container_name: aiox-ray-postgres
+    environment:
+      POSTGRES_USER: aiox
+      POSTGRES_PASSWORD: aiox_secure_password_123
+      POSTGRES_DB: aiox_ray
+    ports:
+      - '5432:5432'
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U aiox']
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - aiox-network
+
+  # Collector Service
+  collector:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: aiox-ray-collector
+    environment:
+      PORT: 3001
+      NODE_ENV: development
+      LOG_LEVEL: info
+      DATABASE_URL: postgresql://aiox:aiox_secure_password_123@postgres:5432/aiox_ray
+      COLLECTOR_TOKEN: test-token-secret-123
+    ports:
+      - '3001:3001'
+    depends_on:
+      postgres:
+        condition: service_healthy
+    volumes:
+      - .:/app
+      - /app/node_modules
+    networks:
+      - aiox-network
+    command: npm run dev
+
+  # PostgreSQL Test Database (for running tests)
+  postgres-test:
+    image: postgres:14-alpine
+    container_name: aiox-ray-postgres-test
+    environment:
+      POSTGRES_USER: test
+      POSTGRES_PASSWORD: test
+      POSTGRES_DB: aiox_ray_test
+    ports:
+      - '5433:5432'
+    volumes:
+      - postgres_test_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U test']
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - aiox-network
+
+volumes:
+  postgres_data:
+    driver: local
+  postgres_test_data:
+    driver: local
+
+networks:
+  aiox-network:
+    driver: bridge
