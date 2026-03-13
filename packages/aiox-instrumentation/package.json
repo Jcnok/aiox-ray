@@ -1,0 +1,23 @@
+{
+  "name": "@aiox-ray/instrumentation",
+  "version": "0.1.0",
+  "description": "Event instrumentation module for AIOX-Ray observability system",
+  "main": "src/index.js",
+  "scripts": {
+    "test": "node tests/event-emitter.test.js",
+    "test:integration": "node tests/integration.test.js",
+    "test:all": "npm run test && npm run test:integration"
+  },
+  "keywords": [
+    "aiox",
+    "instrumentation",
+    "observability",
+    "events"
+  ],
+  "author": "AIOX Team",
+  "license": "MIT",
+  "dependencies": {
+    "uuid": "^9.0.0"
+  },
+  "devDependencies": {}
+}
