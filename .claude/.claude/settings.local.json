@@ -1,0 +1,22 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(gh auth:*)",
+      "Bash(cd /home/jcnok/claude-test && gh repo create aiox-ray --public --description \"Sistema de observabilidade para agentes AIOX\" --source=. --remote=origin --push)",
+      "Bash(cd /home/jcnok/claude-test && mkdir -p .github/workflows docs/qa/coderabbit-reports)",
+      "Bash(chmod +x /home/jcnok/claude-test/scripts/setup-github-infrastructure.sh && cd /home/jcnok/claude-test && bash scripts/setup-github-infrastructure.sh)",
+      "Bash(cd /home/jcnok/claude-test && gh secret set COLLECTOR_TOKEN --body \"Bearer aiox-ray-collector-token-placeholder\" 2>&1 || echo \"Secret set \\(or already exists\\)\")",
+      "Bash(cd /home/jcnok/claude-test && gh secret set DATABASE_URL --body \"postgresql://aiox:password@localhost:5432/aiox_ray\" 2>&1 || echo \"Secret set \\(or already exists\\)\")",
+      "Bash(cd /home/jcnok/claude-test && npm install uuid 2>&1 | tail -5)",
+      "Bash(cd /home/jcnok/claude-test && node packages/aiox-instrumentation/tests/event-emitter.test.js)",
+      "Bash(cd /home/jcnok/claude-test && timeout 30 node packages/aiox-instrumentation/tests/integration.test.js 2>&1 || true)",
+      "Bash(find /home/jcnok/claude-test -name \"*qa*.md\" -o -name \"*architect*.md\" 2>/dev/null | grep -E \"\\(agents|qa|architect\\)\" | head -10)",
+      "Bash(cd /home/jcnok/claude-test && node packages/aiox-instrumentation/tests/event-emitter.test.js 2>&1 | tail -20)",
+      "Bash(cd /home/jcnok/claude-test && timeout 30 node packages/aiox-instrumentation/tests/integration.test.js 2>&1 | tail -15)",
+      "Bash(cd /home/jcnok/claude-test && node packages/aiox-instrumentation/tests/skill-hook.test.js)",
+      "Bash(cd /home/jcnok/claude-test && timeout 15 node packages/aiox-instrumentation/tests/skill-hook-integration.test.js 2>&1)",
+      "Bash(cd /home/jcnok/claude-test/packages/aiox-instrumentation && npm test 2>&1 | head -100)",
+      "Bash(npm run:*)"
+    ]
+  }
+}

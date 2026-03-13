@@ -4,8 +4,8 @@
   "description": "Event instrumentation module for AIOX-Ray observability system",
   "main": "src/index.js",
   "scripts": {
-    "test": "node tests/event-emitter.test.js",
-    "test:integration": "node tests/integration.test.js",
+    "test": "node tests/event-emitter.test.js && node tests/skill-hook.test.js",
+    "test:integration": "node tests/integration.test.js && node tests/skill-hook-integration.test.js",
     "test:all": "npm run test && npm run test:integration"
   },
   "keywords": [
