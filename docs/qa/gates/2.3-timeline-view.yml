@@ -1,0 +1,41 @@
+schema: 1
+story: '2.3'
+gate: PASS
+status_reason: 'Re-gate after QA fixes. All medium issues resolved: MNT-001 fixed (bucket_id delimiter changed to pipe, bucketTime stored separately), PERF-001 accepted as tech debt (works at current scale, virtualization deferred). Low issues MNT-002/003/004 also fixed. 120/120 tests passing, TypeScript clean, build OK (4.17s, 175KB).'
+reviewer: 'Quinn'
+updated: '2026-03-14T06:00:00Z'
+previous_gate:
+  verdict: CONCERNS
+  date: '2026-03-14T05:20:00Z'
+  issues_count: 6
+resolved_issues:
+  - id: 'MNT-001'
+    severity: medium
+    status: FIXED
+    resolution: 'Changed bucket_id delimiter from "-" to "|". Stored bucketTime separately in Map as { bucketTime, executions[] } instead of parsing from bucket_id.'
+  - id: 'PERF-001'
+    severity: medium
+    status: ACCEPTED_AS_DEBT
+    resolution: 'Virtualization deferred as tech debt. Current DOM rendering handles ~1000 events well. Follow-up story needed if approaching 5000 events.'
+  - id: 'MNT-002'
+    severity: low
+    status: FIXED
+    resolution: 'Replaced any type with typed RawEvent interface in timelineCalculator.ts.'
+  - id: 'MNT-003'
+    severity: low
+    status: FIXED
+    resolution: 'TimelineGrid now measures container width via containerRef with useState, falls back to DEFAULT_CANVAS_WIDTH (1200px).'
+  - id: 'MNT-004'
+    severity: low
+    status: FIXED
+    resolution: 'Removed unused widthPx prop from TimelineTooltip, removed unused Execution import from TimelineView.'
+  - id: 'TEST-001'
+    severity: low
+    status: ACCEPTED
+    resolution: 'Coverage plugin version mismatch is pre-existing. E2E deferred (no running server). 120/120 unit+integration tests verified.'
+remaining_debt:
+  - id: 'PERF-001'
+    description: 'react-window virtualization for large datasets (>5000 events)'
+    priority: low
+    target: 'Follow-up story'
+waiver: { active: false }
