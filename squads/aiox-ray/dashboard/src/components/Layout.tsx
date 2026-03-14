@@ -4,6 +4,7 @@ import EventList from './EventList'
 import MetricsCards from './MetricsCards'
 import { TimelineView } from './TimelineView'
 import { FlowGraph } from './FlowGraph'
+import { DrilldownPane } from './DrilldownPane'
 import { useMetrics } from '../hooks/useMetrics'
 import { useTimeline } from '../hooks/useTimeline'
 import { useFlowGraph } from '../hooks/useFlowGraph'
@@ -13,6 +14,7 @@ export default function Layout() {
   const { metrics, trends } = useMetrics()
   const { timelineData, isLoading: timelineLoading } = useTimeline()
   const { graphData, isLoading: graphLoading } = useFlowGraph()
+  const selectedExecutionId = useUIStore((s) => s.selectedExecutionId)
   const setSelectedExecution = useUIStore((s) => s.setSelectedExecution)
 
   return (
@@ -53,6 +55,14 @@ export default function Layout() {
           </div>
         </main>
       </div>
+
+      {/* Drill-down Detail Pane */}
+      {selectedExecutionId && (
+        <DrilldownPane
+          executionId={selectedExecutionId}
+          onClose={() => setSelectedExecution(null)}
+        />
+      )}
     </div>
   )
 }

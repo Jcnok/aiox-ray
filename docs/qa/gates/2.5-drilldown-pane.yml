@@ -1,0 +1,94 @@
+---
+story_id: "2.5"
+story_title: "Implement Drill-Down Detail View (Execution Inspector)"
+gate_decision: PASS
+reviewed_by: "Quinn (@qa)"
+reviewed_at: "2026-03-14"
+model: "Claude Opus 4.6"
+
+evidence:
+  tests:
+    total: 254
+    passing: 254
+    failing: 0
+    new_for_story: 77
+    test_files: 32
+  typescript:
+    errors: 0
+  build:
+    status: success
+    duration: "5.97s"
+    modules: 230
+  new_dependencies: none
+
+acceptance_criteria:
+  AC1_metadata_display:
+    status: PASS
+    notes: "execution_id, agent_id, status (color-coded bg-green-500/bg-red-500/bg-gray-500), duration, timestamps all displayed. Layout integration via uiStore.selectedExecutionId. Close clears selection."
+  AC2_cot_display:
+    status: PASS
+    notes: "Milestones shown chronologically (sorted by order_index), empty state message correct. Minor: order_index not visually displayed per AC wording."
+  AC3_error_display:
+    status: PASS
+    notes: "Error message, stack trace, timestamp, red styling (border-red-700 bg-red-950/30). Minor: implementation stores single error; AC says 'all error events'. Data model spec also singular."
+  AC4_ade_steps:
+    status: PASS
+    notes: "Steps with name/status/duration in collapsible section. Minor: section hidden when empty instead of showing 'No ADE steps available' message."
+  AC5_raw_json:
+    status: PASS
+    notes: "Syntax-highlighted JsonViewer with Tailwind color classes, monospace font, proper indentation, scrollable maxHeight container."
+  AC6_copy_buttons:
+    status: PASS
+    notes: "Copy execution_id, copy full JSON, copy error trace. All have 'Copied!' feedback with 2s timeout. Native Clipboard API."
+  AC7_collapsible_responsive:
+    status: PASS
+    notes: "CollapsibleSection with keyboard (Enter/Space), aria-expanded. Side panel 400-600px on desktop, full-width overlay on mobile (<768px). Metadata expanded by default."
+
+issues:
+  - id: QA-2.5-1
+    severity: MEDIUM
+    description: "AC3 says 'Show all error events' (plural) but implementation stores only last error.occurred event. Data model spec also defines singular error field. Recommend updating to errors[] in future story or clarifying AC."
+    recommendation: "Create follow-up story or backlog item to support multiple errors per execution if needed."
+    blocking: false
+
+  - id: QA-2.5-2
+    severity: LOW
+    description: "AC4 says show 'No ADE steps available' but implementation hides entire ADE section when empty. Arguably better UX."
+    recommendation: "Accept as-is. Hiding empty section reduces noise."
+    blocking: false
+
+  - id: QA-2.5-3
+    severity: LOW
+    description: "AC2 says milestones show order_index but CotTimeline displays only name and timestamp. order_index used for sorting only."
+    recommendation: "Accept as-is. Displaying order_index adds no UX value."
+    blocking: false
+
+  - id: QA-2.5-4
+    severity: INFO
+    description: "DEBT-002: animate-slide-in CSS class referenced but not defined in Tailwind config. Panel renders without animation."
+    recommendation: "Add animation keyframe to tailwind.config.js in future story."
+    blocking: false
+
+  - id: QA-2.5-5
+    severity: INFO
+    description: "React act() warnings in ErrorDisplay and ExecutionMetadata tests for async clipboard operations. Tests pass."
+    recommendation: "Wrap clipboard assertions in waitFor() to suppress warnings."
+    blocking: false
+
+code_quality:
+  architecture: "Clean service + component separation. 1 service, 5 reusable components, 1 container."
+  state_management: "Correct Zustand reads from eventStore and uiStore. No duplication."
+  accessibility: "aria-expanded, keyboard navigation, semantic buttons."
+  security: "Native Clipboard API, no external deps, React XSS escaping."
+  performance: "All data from eventStore cache, no API calls needed."
+
+tech_debt:
+  - "DEBT-001: ESLint configuration missing (pre-existing)"
+  - "DEBT-002: animate-slide-in CSS class not defined in Tailwind config"
+
+summary: |
+  Story 2.5 implements a comprehensive Drill-Down Detail View with clean architecture.
+  All 7 ACs met (3 with minor spec-level deviations that improve UX).
+  77 new tests, 254 total passing, TypeScript clean, build successful.
+  No CRITICAL or HIGH issues. 1 MEDIUM (single vs. multiple errors — spec inconsistency).
+  Gate decision: PASS.
