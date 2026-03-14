@@ -3,12 +3,17 @@ import Sidebar from './Sidebar'
 import EventList from './EventList'
 import MetricsCards from './MetricsCards'
 import { TimelineView } from './TimelineView'
+import { FlowGraph } from './FlowGraph'
 import { useMetrics } from '../hooks/useMetrics'
 import { useTimeline } from '../hooks/useTimeline'
+import { useFlowGraph } from '../hooks/useFlowGraph'
+import { useUIStore } from '../stores/uiStore'
 
 export default function Layout() {
   const { metrics, trends } = useMetrics()
   const { timelineData, isLoading: timelineLoading } = useTimeline()
+  const { graphData, isLoading: graphLoading } = useFlowGraph()
+  const setSelectedExecution = useUIStore((s) => s.setSelectedExecution)
 
   return (
     <div className="h-screen flex flex-col bg-primary">
@@ -25,6 +30,18 @@ export default function Layout() {
               Execution Timeline
             </h2>
             <TimelineView timelineData={timelineData} isLoading={timelineLoading} />
+          </div>
+
+          {/* Flow Graph */}
+          <div className="my-6">
+            <h2 className="text-lg font-semibold text-white mb-4">
+              Agent Flow Graph
+            </h2>
+            <FlowGraph
+              graphData={graphData}
+              onSelectNode={setSelectedExecution}
+              isLoading={graphLoading}
+            />
           </div>
 
           {/* Events List */}
