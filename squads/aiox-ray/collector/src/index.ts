@@ -5,6 +5,7 @@ import rateLimit from 'express-rate-limit';
 import pino from 'pino';
 import pinoHttp from 'pino-http';
 import eventsRoutes from './routes/events';
+import sseRoutes from './routes/sse';
 import { errorHandler, notFoundHandler } from './middleware/errorHandler';
 import { requestLogger } from './middleware/requestLogger';
 import { getConfig } from './config';
@@ -75,6 +76,17 @@ app.get('/health', (req: Request, res: Response) => {
 
 // Mount events routes
 app.use('/events', eventsRoutes);
+
+// Mount SSE routes
+app.use('/events', sseRoutes);
+
+// Serve React SPA static files
+app.use(express.static('public'));
+
+// SPA 404 fallback to index.html
+app.get('*', (req: Request, res: Response) => {
+  res.sendFile('public/index.html', { root: '.' });
+});
 
 // 404 handler
 app.use(notFoundHandler);
