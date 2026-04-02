@@ -1,208 +1,250 @@
 # AIOX-Ray Dashboard
 
-React SPA for real-time visualization of AIOX agent execution events.
+SPA React para observabilidade em tempo real das execuções de agentes AIOX, consumindo eventos via Server-Sent Events (SSE) do Collector.
 
-## Setup
+## Objetivo
 
-### Prerequisites
+O dashboard consolida, na mesma tela, quatro perspectivas complementares da execução:
+
+- **Visão geral de métricas** (execuções, duração média, taxa de erro e agentes ativos)
+- **Linha do tempo de execuções** por agente
+- **Grafo de fluxo** (relações entre agentes/skills)
+- **Painel drill-down** para inspeção detalhada por `execution_id`
+
+A aplicação foi implementada para operação em tempo real, com atualização contínua a partir do endpoint `/events/stream`.
+
+## Funcionalidades implementadas
+
+### 1) Ingestão em tempo real (SSE)
+- Conexão automática ao montar a aplicação (`useEventStream`)
+- Retry com backoff exponencial + jitter em falhas de conexão
+- Alimentação contínua do `eventStore` (Zustand)
+- Limpeza automática de conexão no unmount
+
+### 2) Métricas e tendências
+- Cards para:
+  - Total de execuções
+  - Duração média
+  - Taxa de erro
+  - Número de agentes ativos
+- Recalculo periódico com base no stream de eventos
+- Cálculo de tendência de 7 dias
+
+### 3) Timeline
+- Agrupamento por agente
+- Posicionamento temporal das execuções em lanes
+- Tooltip de detalhe por barra de execução
+- Scroll para datasets maiores
+
+### 4) Flow Graph (DAG)
+- Nós para agentes/skills
+- Arestas de relacionamento entre execuções
+- Interação com pan/zoom/drag (React Flow)
+- MiniMap, controles nativos e filtro por agente
+
+### 5) Drill-down detail pane
+- Abertura por seleção de execução
+- Seções colapsáveis (metadata, I/O, CoT, erros, ADE, JSON bruto)
+- Cópia de JSON completo para inspeção
+
+## Arquitetura de alto nível
+
+```text
+Browser (React SPA)
+  └─ useEventStream() -> EventSource('/events/stream')
+       └─ SSEClient (retry/backoff)
+            └─ eventStore (Zustand)
+                 ├─ useMetrics()     -> MetricsCards
+                 ├─ useTimeline()    -> TimelineView
+                 ├─ useFlowGraph()   -> FlowGraph
+                 └─ DrilldownPane    -> buildExecutionDetail()
+
+Collector (Express)
+  ├─ GET /health
+  ├─ GET /events/stream
+  ├─ GET /events/stream-health
+  └─ static serving de /public (SPA)
+```
+
+## Stack técnico
+
+- **Frontend:** React 18 + TypeScript + Vite
+- **Estado:** Zustand
+- **Visualização:** Recharts + @xyflow/react
+- **Estilo:** Tailwind CSS
+- **Testes:** Vitest + Testing Library + jsdom
+- **Backend de stream:** Express (Collector) + PostgreSQL
+
+## Estrutura principal
+
+```text
+squads/aiox-ray/dashboard/
+├── src/
+│   ├── components/
+│   │   ├── Layout.tsx
+│   │   ├── MetricsCards.tsx
+│   │   ├── TimelineView.tsx
+│   │   ├── FlowGraph.tsx
+│   │   ├── DrilldownPane.tsx
+│   │   └── ...
+│   ├── hooks/
+│   │   ├── useEventStream.ts
+│   │   ├── useMetrics.ts
+│   │   ├── useTimeline.ts
+│   │   └── useFlowGraph.ts
+│   ├── services/
+│   │   ├── sseClient.ts
+│   │   ├── metricsCalculator.ts
+│   │   ├── timelineCalculator.ts
+│   │   ├── graphBuilder.ts
+│   │   └── executionDetailBuilder.ts
+│   ├── stores/
+│   │   ├── eventStore.ts
+│   │   ├── filterStore.ts
+│   │   └── uiStore.ts
+│   ├── App.tsx
+│   └── index.tsx
+├── tests/
+│   ├── unit/
+│   └── integration/
+└── README.md
+```
+
+## Pré-requisitos
+
 - Node.js 18+
-- npm or yarn
+- npm
+- Collector configurado no projeto (`squads/aiox-ray/collector`)
+- PostgreSQL acessível ao Collector
 
-### Installation
+## Instalação
 
-```bash
-cd squads/aiox-ray/dashboard
-npm install
-```
-
-## Development
-
-Start the development server:
+Na raiz do repositório:
 
 ```bash
-npm run dev
+npm --prefix squads/aiox-ray/dashboard install
+npm --prefix squads/aiox-ray/collector install
 ```
 
-The dashboard will be available at `http://localhost:5173` (Vite dev server) or `http://localhost:3001` (when served from Collector).
+## Execução em desenvolvimento
 
-## Building
-
-Create a production build:
+### Opção A — Dashboard isolado (Vite)
 
 ```bash
-npm run build
+npm --prefix squads/aiox-ray/dashboard run dev
 ```
 
-Output: `dist/` directory (static files)
+A SPA sobe em `http://localhost:5173`.
 
-## Testing
+### Opção B — Fluxo integrado (recomendado para validação E2E)
 
-### Run all tests
+1. Build da SPA:
 
 ```bash
-npm test
+npm --prefix squads/aiox-ray/dashboard run build
 ```
 
-### Run tests in watch mode
+2. Publicar build no Collector:
 
 ```bash
-npm run test:watch
+cp -r squads/aiox-ray/dashboard/dist/* squads/aiox-ray/collector/public/
 ```
 
-### Run specific test file
+3. Subir o Collector:
 
 ```bash
-npm test -- eventStore.test.ts
+npm --prefix squads/aiox-ray/collector run dev
 ```
 
-### Generate coverage report
+4. Acessar:
+
+- Dashboard: `http://localhost:3001`
+- Health: `http://localhost:3001/health`
+- SSE health: `http://localhost:3001/events/stream-health`
+
+## Scripts (dashboard)
 
 ```bash
-npm test -- --coverage
+npm --prefix squads/aiox-ray/dashboard run dev
+npm --prefix squads/aiox-ray/dashboard run build
+npm --prefix squads/aiox-ray/dashboard run preview
+npm --prefix squads/aiox-ray/dashboard run test
+npm --prefix squads/aiox-ray/dashboard run test:ui
+npm --prefix squads/aiox-ray/dashboard run type-check
+npm --prefix squads/aiox-ray/dashboard run lint
 ```
 
-## Architecture
+## Testes e validação recomendada
 
-### Directory Structure
+Fluxo mínimo para validação local:
 
-```
-src/
-├── components/       # React components
-│   ├── Header.tsx
-│   ├── Sidebar.tsx
-│   ├── Layout.tsx
-│   └── EventList.tsx
-├── stores/          # Zustand state management
-│   ├── eventStore.ts
-│   ├── filterStore.ts
-│   └── uiStore.ts
-├── hooks/           # React hooks
-│   └── useEventStream.ts
-├── services/        # Services
-│   └── sseClient.ts
-├── App.tsx          # Root component
-├── index.tsx        # Entry point
-└── index.css        # Global styles
-
-tests/
-├── unit/           # Unit tests
-├── integration/    # Integration tests
-└── fixtures/       # Test data
+```bash
+npm --prefix squads/aiox-ray/dashboard run test -- --run
+npm --prefix squads/aiox-ray/dashboard run type-check
+npm --prefix squads/aiox-ray/dashboard run build
 ```
 
-### State Management (Zustand)
+Para o Collector:
 
-**eventStore**: Global event stream
-- `events`: Array of Event objects
-- `addEvent()`: Add single event
-- `setEvents()`: Replace all events
-- `clearEvents()`: Clear all events
-- `getEventsByExecutionId()`: Filter by execution ID
+```bash
+npm --prefix squads/aiox-ray/collector run test
+npm --prefix squads/aiox-ray/collector run build
+```
 
-**filterStore**: User-selected filters
-- `agentId`: Chosen agent filter
-- `startTime`, `endTime`: Time range filter
-- `errorType`: Error type filter
-- Methods to update each filter
+## Como os dados são processados
 
-**uiStore**: UI state
-- `selectedExecutionId`: Currently inspected execution
-- `isLoading`: Data loading state
-- `error`: Error message to display
+1. Collector expõe `/events/stream` e faz polling do banco para novos eventos.
+2. Frontend abre `EventSource` com reconexão automática (`SSEClient`).
+3. Eventos entram no `eventStore`.
+4. Hooks derivados (`useMetrics`, `useTimeline`, `useFlowGraph`) recalculam visões em intervalos distintos.
+5. Seleção de execução abre o `DrilldownPane` via `uiStore.selectedExecutionId`.
 
-### SSE Integration
+## Decisões de implementação relevantes
 
-**useEventStream hook**: Subscribes to `/events/stream` endpoint on Collector
-
-- Automatically connects on component mount
-- Parses JSON events from SSE stream
-- Adds events to eventStore in real-time
-- Handles disconnections with exponential backoff retry
-- Cleans up on unmount
-
-**SSEClient service**: Low-level SSE connection management
-
-- Manages EventSource lifecycle
-- Implements exponential backoff for retries (1s → 2s → 4s... max 30s)
-- Max 10 retry attempts
-- Graceful error handling
-
-## Deployment
-
-### Prerequisites
-
-1. Collector service must be running (port 3001)
-2. PostgreSQL database must be accessible from Collector
-3. Dashboard build must be copied to Collector's public directory
-
-### Steps
-
-1. **Build React SPA**
-   ```bash
-   npm run build
-   ```
-
-2. **Copy to Collector**
-   ```bash
-   cp -r dist/* ../collector/public/
-   ```
-
-3. **Start Collector**
-   ```bash
-   cd ../collector
-   npm run dev
-   ```
-
-4. **Access Dashboard**
-   - Open `http://localhost:3001`
-   - Dashboard will connect to SSE stream at `/events/stream`
-   - Real-time events will appear immediately
-
-## Performance Targets
-
-- Dashboard initial load: <2 seconds
-- SSE connection: <500ms
-- Real-time event latency: <100ms (p95)
-- Responsive on desktop (1920px) and tablet (768px)
+- **SSE com retry no frontend:** robustez para instabilidade de rede.
+- **Stores leves com Zustand:** baixo overhead e simplicidade.
+- **Cálculo derivado em hooks:** evita store adicional para dados computados.
+- **Serviço de transformação por domínio:** `metricsCalculator`, `timelineCalculator`, `graphBuilder`, `executionDetailBuilder`.
 
 ## Troubleshooting
 
-### Dashboard doesn't load
+### Dashboard não carrega em `:3001`
 
-1. Verify Collector is running: `curl http://localhost:3001/health`
-2. Check browser console for errors
-3. Verify network tab shows successful fetch for `index.html`
+- Verifique se o Collector está em execução.
+- Confirme que `collector/public` contém o build atualizado da SPA.
+- Teste `GET /health`.
 
-### Events not appearing
+### Eventos não aparecem
 
-1. Verify SSE connection: Open DevTools → Network → Look for `/events/stream` (should be EventSource)
-2. Check Collector logs for SSE errors
-3. Verify PostgreSQL has events in `events` table
-4. Try emitting a test event from CLI
+- Verifique conexão SSE no DevTools (requisição `events/stream`).
+- Teste `GET /events/stream-health`.
+- Verifique se há eventos no banco do Collector.
 
-### SSE reconnecting frequently
+### Reconexões constantes
 
-1. Check Collector logs for errors
-2. Verify database connection is stable
-3. Check for network issues between browser and Collector
-4. Increase polling interval if database queries are slow
+- Inspecione logs do Collector.
+- Verifique conectividade com PostgreSQL.
+- Revise erros de rede/proxy local.
 
-## Future Enhancements
+### Lint falhando por configuração
 
-- Story 2.2: Metrics Cards (overview statistics)
-- Story 2.3: Timeline View (Gantt chart)
-- Story 2.4: Interactive Flow Graph
-- Story 2.5: Drill-Down Detail View
-- Dark mode support
-- Filtering and search capabilities
-- Export data to CSV/JSON
-- Audit reports
+- O backlog técnico registra ausência de configuração ESLint do dashboard (ver seção de débitos).
 
-## References
+## Débitos técnicos conhecidos
 
-- [Architecture](../../docs/architecture-dashboard.md)
-- [Epic 2: Dashboard & Visualization](../../docs/prd.md#epic-2--dashboard--visualization)
-- React: https://react.dev
-- Zustand: https://github.com/pmndrs/zustand
-- Vite: https://vitejs.dev
-- Tailwind CSS: https://tailwindcss.com
+Backlog consolidado em:
+
+- `docs/tech-debt-backlog.md`
+
+Prioridades atuais:
+
+1. Configurar ESLint no dashboard
+2. Avaliar virtualização da timeline para alto volume de eventos
+3. Reduzir casts `as any` no Flow Graph
+
+## Referências internas
+
+- Arquitetura: `docs/architecture-dashboard.md`
+- PRD: `docs/prd.md`
+- Stories do Epic 2: `docs/stories/2.1.story.md` até `docs/stories/2.5.story.md`
+- Backlog técnico: `docs/tech-debt-backlog.md`

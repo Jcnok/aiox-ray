@@ -1,3 +1,7 @@
+# CRITICAL EFFICIENCY RULE:
+I have a strict limit of 100 requests total. Do NOT ask for clarifications. Do NOT perform incremental edits. For every request, analyze the maximum amount of code possible and provide the most comprehensive output (up to 100k+ tokens if needed). Execute as many steps of the AIOX methodology as possible in a single turn.
+
+
 # Synkra AIOX Development Rules for Claude Code
 
 You are working with Synkra AIOX, an AI-Orchestrated System for Full Stack Development.

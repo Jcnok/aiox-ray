@@ -1,10 +1,10 @@
 # AIOX-Ray Dashboard & Visualization Architecture
 ## Epic 2: Dashboard & Visualization
 
-**Version:** 1.0
+**Version:** 1.1
 **Date:** 2026-03-13
 **Author:** Aria (Architect)
-**Status:** Ready for Implementation
+**Status:** Epic 2 implemented and closed (stories 2.1–2.5 delivered)
 **Epic:** 2 (Dashboard & Visualization)
 **Depends On:** Epic 1 ✅ (Data Instrumentation & Collection)
 
@@ -809,9 +809,10 @@ VITE_SSE_URL=https://collector.aiox-ray.example.com/events/stream
 | Date | Version | Description | Author |
 |------|---------|-------------|--------|
 | 2026-03-13 | 1.0 | Initial Dashboard architecture for Epic 2 | Aria |
+| 2026-04-02 | 1.1 | Epic 2 closure update: implementation completed (stories 2.1–2.5) | Claude |
 
 ---
 
-**Document Status:** ✅ Ready for Story 2.1 Implementation
-**Next Review Date:** After Story 2.1 completion
-**Distribution:** @sm (River) for Story 2.1 creation → @dev (Dex) for implementation
+**Document Status:** ✅ Epic 2 closed — implemented stories 2.1–2.5 delivered
+**Next Review Date:** When Epic 3 dashboard integrations begin
+**Distribution:** @pm/@sm for roadmap continuation to Epic 3
