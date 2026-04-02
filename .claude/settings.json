@@ -1,3 +1,6 @@
 {
-  "language": "portuguese"
+  "language": "portuguese",
+  "permissions": {
+    "deny": ["WebSearch"]
+  }
 }

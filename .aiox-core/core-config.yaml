@@ -17,6 +17,39 @@ ide:
     zed: false
     claude-desktop: false
     claude-code: true
+ideSync:
+  # Claude-only policy: keep non-Claude IDE targets disabled
+  enabled: true
+  source: .aiox-core/development/agents
+  targets:
+    claude-code:
+      enabled: true
+      path: .claude/commands/AIOX/agents
+      format: full-markdown-yaml
+    codex:
+      enabled: false
+      path: .codex/agents
+      format: full-markdown-yaml
+    gemini:
+      enabled: false
+      path: .gemini/rules/AIOX/agents
+      format: full-markdown-yaml
+    github-copilot:
+      enabled: false
+      path: .github/agents
+      format: github-copilot
+    cursor:
+      enabled: false
+      path: .cursor/rules/agents
+      format: condensed-rules
+    antigravity:
+      enabled: false
+      path: .antigravity/rules/agents
+      format: cursor-style
+  validation:
+    strictMode: true
+    failOnDrift: true
+    failOnOrphaned: false
 mcp:
   enabled: false
   configLocation: .claude/mcp.json
