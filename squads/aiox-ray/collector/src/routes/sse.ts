@@ -1,5 +1,5 @@
 import { Router, Request, Response, NextFunction } from 'express';
-import { getPool } from '../db/pool';
+import pool from '../db/client';
 import pino from 'pino';
 
 const logger = pino();
@@ -44,12 +44,13 @@ router.get('/stream', (req: Request, res: Response, next: NextFunction) => {
   startPollingForEvents(res);
 });
 
-let lastEventId: string | null = null;
-
 /**
  * Poll database for new events and stream them to clients
  */
 function startPollingForEvents(res: Response): void {
+  // Mantemos o rastro do último ID enviado nesta conexão específica
+  let localLastEventId: string | null = null;
+
   const pollInterval = setInterval(async () => {
     try {
       if (!res.writable) {
@@ -57,27 +58,37 @@ function startPollingForEvents(res: Response): void {
         return;
       }
 
-      const pool = getPool();
-      const query = `
-        SELECT
-          event_id,
-          event_type,
-          agent_id,
-          execution_id,
-          timestamp,
-          duration_ms,
-          payload
-        FROM events
-        WHERE event_id > $1
-        ORDER BY timestamp ASC
-        LIMIT 50
-      `;
+      // Se não temos um ID inicial, pegamos apenas eventos criados a partir de AGORA
+      // para evitar re-enviar o histórico inteiro via stream (o dashboard já puxa o histórico via GET)
+      let query: string;
+      let queryParams: any[] = [];
 
-      const result = await pool.query(query, [lastEventId || '0']);
+      if (localLastEventId) {
+        query = `
+          SELECT event_id, event_type, agent_id, execution_id, timestamp, duration_ms, payload
+          FROM events
+          WHERE event_id > $1
+          ORDER BY timestamp ASC
+          LIMIT 50
+        `;
+        queryParams = [localLastEventId];
+      } else {
+        // Na primeira execução do poll, buscamos eventos dos últimos 5 segundos para "aquecer" o stream
+        // sem causar erro de sintaxe UUID '0'
+        query = `
+          SELECT event_id, event_type, agent_id, execution_id, timestamp, duration_ms, payload
+          FROM events
+          WHERE timestamp > NOW() - INTERVAL '5 seconds'
+          ORDER BY timestamp ASC
+          LIMIT 50
+        `;
+      }
+
+      const result = await pool.query(query, queryParams);
 
       // Stream events to client
       result.rows.forEach((row: any) => {
-        const event: any = {
+        const event = {
           event_id: row.event_id,
           event_type: row.event_type,
           agent_id: row.agent_id,
@@ -88,22 +99,17 @@ function startPollingForEvents(res: Response): void {
         };
 
         res.write(`data: ${JSON.stringify(event)}\n\n`);
-        lastEventId = row.event_id;
+        localLastEventId = row.event_id;
       });
     } catch (error) {
+      // Logamos o erro mas mantemos o intervalo vivo para tentar recuperar no próximo ciclo
       logger.error(`[SSE] Polling error: ${(error as Error).message}`);
-      res.write(`: Error polling events\n\n`);
     }
-  }, 500); // Poll every 500ms
+  }, 1000); // Poll a cada 1s para ser mais gentil com o banco em dev
 
   // Cleanup on response end
-  res.on('end', () => {
-    clearInterval(pollInterval);
-  });
-
-  res.on('error', () => {
-    clearInterval(pollInterval);
-  });
+  res.on('end', () => clearInterval(pollInterval));
+  res.on('error', () => clearInterval(pollInterval));
 }
 
 /**

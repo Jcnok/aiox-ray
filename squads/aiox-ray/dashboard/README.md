@@ -138,25 +138,40 @@ A SPA sobe em `http://localhost:5173`.
 
 ### Opção B — Fluxo integrado (recomendado para validação E2E)
 
-1. Build da SPA:
+1. Subir PostgreSQL local:
+
+```bash
+docker run --name aiox-postgres -e POSTGRES_PASSWORD=postgres -e POSTGRES_DB=aiox_ray -p 5432:5432 -d postgres
+```
+
+2. Definir ambiente do Collector:
+
+```bash
+export COLLECTOR_TOKEN=dev-token-local
+export DATABASE_URL=postgresql://postgres:postgres@localhost:5432/aiox_ray
+# opcional para debug local do dashboard
+export DISABLE_EVENTS_AUTH=true
+```
+
+3. Build da SPA:
 
 ```bash
 npm --prefix squads/aiox-ray/dashboard run build
 ```
 
-2. Publicar build no Collector:
+4. Publicar build no Collector:
 
 ```bash
 cp -r squads/aiox-ray/dashboard/dist/* squads/aiox-ray/collector/public/
 ```
 
-3. Subir o Collector:
+5. Subir o Collector:
 
 ```bash
 npm --prefix squads/aiox-ray/collector run dev
 ```
 
-4. Acessar:
+6. Acessar:
 
 - Dashboard: `http://localhost:3001`
 - Health: `http://localhost:3001/health`
@@ -191,6 +206,24 @@ npm --prefix squads/aiox-ray/collector run test
 npm --prefix squads/aiox-ray/collector run build
 ```
 
+## Checklist de validação E2E local
+
+1. **Build do front-end** e cópia para `collector/public`.
+2. **Collector com variáveis válidas** (`COLLECTOR_TOKEN`, `DATABASE_URL`).
+3. **Injeção de evento mock** com UUID/timestamp válidos:
+
+```bash
+E_ID=$(node -e "console.log(require('crypto').randomUUID())")
+TS=$(node -e "console.log(new Date().toISOString())")
+
+curl -X POST "http://localhost:3001/events" \
+  -H "Authorization: Bearer dev-token-local" \
+  -H "Content-Type: application/json" \
+  -d "{\"event_type\":\"agent.started\",\"agent_id\":\"dev\",\"execution_id\":\"$E_ID\",\"timestamp\":\"$TS\"}"
+```
+
+4. **Validação visual** no dashboard (`localhost:3001`) confirmando atualização em tempo real sem refresh.
+
 ## Como os dados são processados
 
 1. Collector expõe `/events/stream` e faz polling do banco para novos eventos.
@@ -205,6 +238,7 @@ npm --prefix squads/aiox-ray/collector run build
 - **Stores leves com Zustand:** baixo overhead e simplicidade.
 - **Cálculo derivado em hooks:** evita store adicional para dados computados.
 - **Serviço de transformação por domínio:** `metricsCalculator`, `timelineCalculator`, `graphBuilder`, `executionDetailBuilder`.
+- **Compatibilidade UUID no stream:** primeiro ciclo por janela de tempo e ciclos seguintes por `event_id > $1` com UUID válido.
 
 ## Troubleshooting
 
@@ -219,6 +253,21 @@ npm --prefix squads/aiox-ray/collector run build
 - Verifique conexão SSE no DevTools (requisição `events/stream`).
 - Teste `GET /events/stream-health`.
 - Verifique se há eventos no banco do Collector.
+
+### Erro de UUID no stream SSE
+
+- Sintoma: `invalid input syntax for type uuid` no backend.
+- Verifique se o stream não usa fallback textual (ex.: `'0'`) em comparação com `event_id`.
+- A implementação atual evita isso com janela temporal inicial e cursor UUID depois do primeiro evento.
+
+### 401 Unauthorized em testes locais
+
+- Se necessário para debug local, habilite `DISABLE_EVENTS_AUTH=true`.
+- Para produção, mantenha autenticação habilitada e ajuste estratégia de auth para stream conforme arquitetura de segurança.
+
+### Conflito de dependências de teste (ERESOLVE)
+
+- Garantir alinhamento de `vitest` e `@vitest/coverage-v8` em `^1.6.1`.
 
 ### Reconexões constantes
 
@@ -241,6 +290,7 @@ Prioridades atuais:
 1. Configurar ESLint no dashboard
 2. Avaliar virtualização da timeline para alto volume de eventos
 3. Reduzir casts `as any` no Flow Graph
+4. Remover bypass de auth local da trilha padrão e evoluir para mecanismo seguro de autenticação no stream
 
 ## Referências internas
 
@@ -248,3 +298,11 @@ Prioridades atuais:
 - PRD: `docs/prd.md`
 - Stories do Epic 2: `docs/stories/2.1.story.md` até `docs/stories/2.5.story.md`
 - Backlog técnico: `docs/tech-debt-backlog.md`
+
+## Status operacional de validação local
+
+- **Collector:** operacional na porta `3001`
+- **Dashboard:** conectado ao stream com `statusCode: 200`
+- **Banco:** migrações aplicadas e recebendo eventos de agentes simulados
+
+Sistema apto para integração com runtime AIOX real, apontando `COLLECTOR_URL` para o serviço estabilizado.

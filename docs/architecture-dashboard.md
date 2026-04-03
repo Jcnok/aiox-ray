@@ -1,8 +1,8 @@
 # AIOX-Ray Dashboard & Visualization Architecture
 ## Epic 2: Dashboard & Visualization
 
-**Version:** 1.1
-**Date:** 2026-03-13
+**Version:** 1.2
+**Date:** 2026-04-03
 **Author:** Aria (Architect)
 **Status:** Epic 2 implemented and closed (stories 2.1–2.5 delivered)
 **Epic:** 2 (Dashboard & Visualization)
@@ -318,59 +318,264 @@ function useEvents(filters: FilterState) {
 
 **Display:**
 - X-axis: Time (start_time → finish_time)
-- Y-axis: Agent (group by agent_id)
-- Bars: Execution duration
-- Colors: Status (green=success, red=error, yellow=in-progress)
-- Height: ~40px per agent
+- Y-axis: Agent lanes (dev, qa, architect, orchestrator)
+- Bars: Execution duration (color by status: success=green, error=red, in-progress=blue)
 
 **Features:**
-- Hover: Show duration + execution_id
-- Click bar: Select execution (trigger DrilldownPane)
-- Zoom: Scroll to zoom on time axis
-- Pan: Drag to move timeline
-
-**Performance:** Max 500 bars on screen (paginate if needed)
+- Horizontal scroll for dense timelines
+- Hover tooltip with execution metadata
+- Click bar to open drill-down pane
 
 #### 3. FlowGraph (Story 2.4)
 **Props:**
-- `events: Event[]` — All events
-- `onSelectNode: (nodeId: string) => void` — Selection callback
+- `events: Event[]` — Events to build graph
+- `selectedAgent: string | null` — Filter by agent
 
 **Display:**
-- Nodes: Agents + Skills (node type determines icon)
-- Edges: Event relationships (parent_execution_id → child_execution_id)
-- Node size: Proportional to total_duration
-- Node color: Status (green=success, red=error)
-- Hover label: `agent: avg_duration_ms | error_rate%`
+- Nodes: Agent/Skill executions
+- Edges: Parent-child relationships (execution lineage)
+- Layout: Directed acyclic graph (top-down)
 
 **Features:**
-- Click node: Open NodeDetail popup with stats
-- Pan/Zoom: React Flow built-in
-- Filter by agent: Hide/show agent nodes
-- Legend: Node types and color meanings
+- Pan/zoom support
+- Node hover details
+- Click node to highlight path
+- Filter graph by agent type
+- Mini-map for navigation
 
-**Performance:** Max 50-100 nodes (auto-group if needed)
-
-#### 4. DrilldownPane (Story 2.5)
+#### 4. DrilldownPane (Story 2.4)
 **Props:**
 - `executionId: string` — Selected execution
-- `onClose: () => void` — Close callback
+- `events: Event[]` — All events for execution
 
-**Display:**
-- Execution metadata: execution_id, agent_id, status, duration, timestamps
-- Input/Output: JSON with copy-to-clipboard
-- Chain of Thought: If available (10% sample), show milestones with timestamps
-- Errors: Error events linked to this execution, with stack traces
-- ADE Steps: If available, show recovery steps in timeline
-- Raw JSON: For advanced debugging
+**Display Sections (collapsible):**
+1. **Metadata:** execution_id, agent_id, start_time, end_time, duration
+2. **Input/Output:** Prompt, response, token usage
+3. **Chain of Thought:** Parsed CoT segments with truncation support
+4. **Error Trace:** Stack trace, error type, recovery attempts
+5. **ADE Data:** Subtask graph, dependencies, completion status
+6. **Raw JSON:** Full event payload (copy-to-clipboard)
 
 **Features:**
-- Copy buttons for execution_id, CoT milestones, error traces
-- Collapsible sections for each category
-- Syntax highlighting for JSON
-- "Share" button to generate shareable link (TBD)
+- Collapsible sections (default: metadata expanded)
+- Search within execution events
+- Copy JSON button
+- Keyboard shortcut: ESC to close
+
+#### 5. Filters Panel (Story 2.5)
+**Controls:**
+- Agent multi-select (dev, qa, architect, orchestrator)
+- Time range picker (last hour, today, 7 days, custom)
+- Event type filter (agent.started, error.occurred, etc.)
+- Error-only toggle
+- Search by execution_id
+
+**Behavior:**
+- Debounced filter updates (300ms)
+- URL query params sync (shareable filtered views)
+- Persist filter state in localStorage
 
 ---
+
+## Backend Integration Architecture
+
+### Collector API Endpoints (Consumed by Dashboard)
+
+| Endpoint | Method | Purpose | Auth |
+|----------|--------|---------|------|
+| `/events/stream` | GET (SSE) | Real-time event stream | No (current), target: secured |
+| `/events` | GET | Historical events with filters | Yes (Bearer) |
+| `/metrics` | GET | Aggregated metrics by period | Yes (Bearer) |
+| `/health` | GET | Service health check | No |
+| `/events/stream-health` | GET | SSE connection status | No |
+
+### SSE Contract
+
+**Event Format:**
+```json
+{
+  "event_id": "uuid-v4",
+  "event_type": "agent.started",
+  "agent_id": "dev",
+  "execution_id": "uuid-v4",
+  "timestamp": "2026-03-13T10:00:00.000Z",
+  "duration_ms": 123,
+  "payload": {
+    "story_id": "2.3",
+    "task": "implement timeline"
+  }
+}
+```
+
+**Connection Lifecycle:**
+1. Dashboard opens `EventSource('/events/stream')`
+2. Collector sends welcome message: `{type: "connected", message: "SSE stream connected"}`
+3. Collector polls DB every 1s for new events
+4. New events streamed as `data: {json}\n\n`
+5. Dashboard auto-reconnects with exponential backoff on disconnect
+
+---
+
+## Technical Intervention Log (Stabilization)
+
+### 1) Infraestrutura PostgreSQL para testes locais
+
+Foi necessária uma instância isolada para eliminar falhas de startup por ausência de banco (`ECONNREFUSED`).
+
+```bash
+docker run --name aiox-postgres -e POSTGRES_PASSWORD=postgres -e POSTGRES_DB=aiox_ray -p 5432:5432 -d postgres
+```
+
+### 2) Correção de cursor SSE para UUID
+
+No stream, a comparação `event_id > '0'` era incompatível com o tipo UUID e gerava `invalid input syntax for type uuid`.
+
+Solução implementada em `squads/aiox-ray/collector/src/routes/sse.ts`:
+- Primeiro ciclo: filtro temporal (`timestamp > NOW() - INTERVAL '5 seconds'`)
+- Ciclos seguintes: cursor por `event_id > $1` usando UUID válido
+- Cursor por conexão (`localLastEventId`) para evitar interferência global entre clientes SSE
+
+### 3) Ajuste de autenticação para fluxo local de validação
+
+Para viabilizar validação local do dashboard com EventSource sem headers customizados, foi adotado bypass controlado em `squads/aiox-ray/collector/src/routes/events.ts`:
+- Auth ativa por padrão
+- Bypass apenas com `DISABLE_EVENTS_AUTH=true`
+
+Arquiteturalmente, essa decisão é aceitável para desenvolvimento local e deve permanecer desativada em produção.
+
+### 4) Resolução de conflito de dependências de teste
+
+No dashboard, houve incompatibilidade entre `vitest` e `@vitest/coverage-v8`.
+
+Solução:
+- `vitest`: `^1.6.1`
+- `@vitest/coverage-v8`: `^1.6.1`
+
+Arquivo: `squads/aiox-ray/dashboard/package.json`
+
+### 5) Protocolo de validação ponta a ponta
+
+Fluxo consolidado:
+1. Build dashboard
+2. Publicação de `dist/*` em `collector/public/`
+3. Export de `COLLECTOR_TOKEN` e `DATABASE_URL`
+4. Injeção de evento mock com UUID/timestamp válidos via Node + curl
+5. Verificação visual em `localhost:3001` com atualização sem refresh
+
+---
+
+## Security Architecture Notes
+
+### Current Security Posture
+
+**Production-safe defaults:**
+- `/events` (ingestion/query) remains auth-protected by default
+- `/events/stream` currently open for browser compatibility
+- `DISABLE_EVENTS_AUTH` gate is explicit and opt-in
+
+**Risk acknowledgement:**
+- Disabling auth in any shared environment increases attack surface (event poisoning, unauthorized reads)
+- Must be restricted to local development only
+
+### Recommended Hardening Roadmap
+
+1. Replace local bypass with browser-compatible stream auth pattern:
+   - Signed short-lived stream token in query string, or
+   - Session/cookie-based auth with CSRF protection
+2. Add environment guardrail:
+   - If `NODE_ENV=production`, force `DISABLE_EVENTS_AUTH=false`
+3. Add observability around auth bypass usage in logs
+4. Add integration tests for both secured and local-debug auth modes
+
+---
+
+## Performance Architecture
+
+### SSE Polling Strategy
+
+Current collector polling interval: **1000ms**.
+
+Trade-off:
+- Lower DB pressure in dev/test
+- Slightly higher event freshness latency than 500ms polling
+
+Given dashboard requirements and local stabilization goals, this is a pragmatic baseline. Production tuning should be driven by measured throughput and p95 stream lag.
+
+---
+
+## Deployment & Runtime Considerations
+
+### Integrated Serving Model
+
+Collector serves both:
+- API/SSE endpoints
+- Static dashboard build from `collector/public`
+
+Benefits:
+- Single origin (no CORS complications for dashboard API usage)
+- Simplified local and staging deployment
+
+Operational caveat:
+- Build artifacts in `collector/public` must be refreshed after each dashboard build
+
+---
+
+## Testing & Quality Gates
+
+### Validated Commands
+
+- `npm --prefix squads/aiox-ray/collector run build` ✅
+- `npm --prefix squads/aiox-ray/dashboard run build` ✅
+
+### Suggested ongoing gate (per change)
+
+1. Collector build + tests
+2. Dashboard build + tests + type-check
+3. E2E smoke (stream connect + event appears in UI)
+4. Auth mode smoke (with and without local bypass)
+
+---
+
+## Open Architecture Decisions
+
+1. **Stream auth strategy for production browsers**
+   - Decision needed before promoting this setup beyond local stabilization.
+2. **Event cursor semantics**
+   - `event_id > $1` works for UUID ordering in PostgreSQL lexical context but is not temporal by definition.
+   - Consider strict timestamp + tie-breaker ordering (`timestamp`, `event_id`) for deterministic stream progression under high concurrency.
+3. **SSE replay window**
+   - Current warm-up window is 5 seconds.
+   - Tune based on real ingestion rates and reconnect patterns.
+
+---
+
+## Final Operational Status
+
+- **Collector:** Operacional em `:3001`
+- **Dashboard:** Conectado ao stream com resposta `200`
+- **PostgreSQL:** Migrações aplicadas e ingestão de eventos simulados validada
+
+O sistema está pronto para integração com runtime real AIOX apontando `COLLECTOR_URL` para o serviço estabilizado, condicionado à definição da estratégia final de autenticação para SSE em produção.
+
+---
+
+## Appendix: Troubleshooting Quick Reference
+
+### `ECONNREFUSED` no startup do Collector
+- Validar container PostgreSQL
+- Validar `DATABASE_URL`
+
+### `invalid input syntax for type uuid`
+- Validar se há comparação UUID com fallback textual inválido
+- Confirmar lógica de bootstrap temporal no stream
+
+### `ERESOLVE` no `npm install` do dashboard
+- Confirmar alinhamento de versões Vitest/Coverage
+
+### Dashboard sem eventos em tempo real
+- Verificar `GET /events/stream-health`
+- Verificar logs do collector e presença de eventos no banco
+- Confirmar publicação correta do build em `collector/public`
 
 ## Backend Architecture
 
@@ -810,6 +1015,7 @@ VITE_SSE_URL=https://collector.aiox-ray.example.com/events/stream
 |------|---------|-------------|--------|
 | 2026-03-13 | 1.0 | Initial Dashboard architecture for Epic 2 | Aria |
 | 2026-04-02 | 1.1 | Epic 2 closure update: implementation completed (stories 2.1–2.5) | Claude |
+| 2026-04-03 | 1.2 | Stabilization interventions: UUID-safe SSE cursor, local auth bypass gate, Vitest alignment, E2E validation protocol | Aria |
 
 ---
 

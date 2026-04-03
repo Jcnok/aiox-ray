@@ -8,7 +8,8 @@ The Collector Service is the **hub** of the AIOX Ray observability system. It ac
 
 ## Features
 
-- ✅ **HTTP Event Ingestion** — POST /events with Bearer token authentication
+- ✅ **HTTP Event Ingestion** — POST /events com autenticação Bearer por padrão
+- ✅ **SSE Real-Time Stream** — GET /events/stream para atualização em tempo real no Dashboard
 - ✅ **Schema Validation** — Strict validation of event type, agent_id, timestamp, execution_id
 - ✅ **PostgreSQL Persistence** — JSONB payload storage with efficient indexing
 - ✅ **Query API** — GET /events with filtering (agent_id, event_type, time range) and pagination
@@ -40,6 +41,8 @@ DATABASE_URL=postgresql://user:password@localhost:5432/aiox_ray
 
 # Authentication
 COLLECTOR_TOKEN=your-secret-bearer-token-here
+# Optional (DEV ONLY): disable /events auth for local dashboard tests
+DISABLE_EVENTS_AUTH=false
 ```
 
 ### Installation
@@ -158,6 +161,20 @@ Authorization: Bearer {COLLECTOR_TOKEN}
   "offset": 0
 }
 ```
+
+### Stream Events (SSE)
+
+```bash
+GET /events/stream
+```
+
+This endpoint powers real-time dashboard updates through Server-Sent Events.
+
+**Auth behavior:**
+- `/events` routes require Bearer auth by default.
+- For local debugging only, set `DISABLE_EVENTS_AUTH=true` to bypass auth on `/events` ingestion/query routes.
+- Keep `DISABLE_EVENTS_AUTH=false` in production.
+
 
 ## Event Types
 
@@ -353,15 +370,19 @@ For production deployments:
 - Set COLLECTOR_TOKEN environment variable
 - Check .env file is loaded correctly
 
-### High query latency
-- Verify indices are created (check pg_indexes)
-- Monitor active connections (max 20)
-- Consider partitioning large event tables
+### SSE inválido com erro de UUID (`invalid input syntax for type uuid`)
+- Causa comum: comparar `event_id` (UUID) com valor string inválido (ex.: `'0'`).
+- Solução aplicada: no primeiro ciclo do stream, usar filtro por janela de tempo (`timestamp > NOW() - INTERVAL '5 seconds'`) e, após o primeiro evento, avançar com `event_id > $1` usando UUID válido.
 
-### Memory usage increasing
-- Check for connection leaks (monitor pg_stat_activity)
-- Verify connections are being released
-- Check for accumulated JSONB payloads
+### Dashboard retorna 401 no stream em ambiente local
+- O navegador usa `EventSource` sem cabeçalhos customizados de auth em fluxo padrão.
+- Em desenvolvimento local, habilite bypass controlado com `DISABLE_EVENTS_AUTH=true` para validar integração ponta a ponta.
+- Em produção, mantenha autenticação habilitada (`DISABLE_EVENTS_AUTH=false`).
+
+### Conflito de dependências no dashboard (`ERESOLVE` com Vitest)
+- Causa: incompatibilidade entre `vitest` e `@vitest/coverage-v8`.
+- Solução aplicada: alinhar ambos para `^1.6.1` em `squads/aiox-ray/dashboard/package.json`.
+
 
 ## Contributing
 
