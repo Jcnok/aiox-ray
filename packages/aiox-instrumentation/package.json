@@ -6,7 +6,8 @@
   "scripts": {
     "test": "node tests/event-emitter.test.js && node tests/skill-hook.test.js",
     "test:integration": "node tests/integration.test.js && node tests/skill-hook-integration.test.js",
-    "test:all": "npm run test && npm run test:integration"
+    "test:performance": "node tests/performance.test.js",
+    "test:all": "npm run test && npm run test:integration && npm run test:performance"
   },
   "keywords": [
     "aiox",
@@ -17,6 +18,7 @@
   "author": "AIOX Team",
   "license": "MIT",
   "dependencies": {
+    "js-yaml": "^4.1.0",
     "uuid": "^9.0.0"
   },
   "devDependencies": {}

@@ -210,6 +210,7 @@ Configure via environment variables:
 |----------|-------------|---------|
 | `COLLECTOR_URL` | Collector endpoint | `http://localhost:3001` |
 | `COLLECTOR_TOKEN` | Bearer token | - |
+| `INSTRUMENTATION_ENABLED` | Enable/disable event emission (`false` or `0` disables) | enabled |
 
 ## Retry Strategy
 
@@ -516,6 +517,35 @@ npm run test:integration  # Tests with mock Collector (9 total)
 ```bash
 npm run test:all  # Runs 46 tests total
 ```
+
+### Performance Validation (Story 1.6)
+
+Run the performance suite:
+
+```bash
+npm run test:performance
+```
+
+Run full validation (unit + integration + performance):
+
+```bash
+npm run test:all
+```
+
+Latest validation snapshot:
+
+- Combined overhead: **-0.71%** (threshold: `<5%`)
+- Per-agent overhead:
+  - `@dev`: `-2.74%`
+  - `@qa`: `-1.50%`
+  - `@architect`: `1.64%`
+- Dominant component in breakdown: `async_send` (~99.1%)
+
+Archived report artifacts:
+
+- `docs/performance/story-1.6-latest.json`
+- `docs/performance/story-1.6-latest.csv`
+- `docs/performance/story-1.6-latest.md`
 
 ### Integration Pattern
 

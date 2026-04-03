@@ -164,7 +164,7 @@ class RegexSanitizer {
       },
       {
         name: 'BEARER_TOKEN',
-        pattern: '(?i)(bearer|token)\\s+[a-z0-9._-]+',
+        pattern: '(bearer|token)\\s+[a-z0-9._-]+',
         replace_with: '[REDACTED]',
       },
       {

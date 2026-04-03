@@ -47,6 +47,11 @@ class EventEmitter {
    * @param {object} payload - Event payload data
    */
   emit(eventType, payload = {}) {
+    const instrumentationFlag = String(process.env.INSTRUMENTATION_ENABLED || '').toLowerCase();
+    if (instrumentationFlag === 'false' || instrumentationFlag === '0') {
+      return;
+    }
+
     const event = {
       event_type: eventType,
       timestamp: new Date().toISOString(),
